@@ -1,6 +1,6 @@
 # Xe dò line — AI hỗ trợ vận hành / C++ Qt
 
-Bản mở rộng từ main.cpp và CMakeLists.txt người dùng cung cấp. Giữ target `LineFollowerSim`, C++17, Qt Widgets và tên thư mục `build-vscode`. Không thay file cấu hình VS Code hay cache build của bạn. Gói không chứa binary/cache Linux để chép vào Windows.
+Ứng dụng desktop C++17 / Qt6 Widgets, build bằng CMake với target `LineFollowerSim`. Dùng lại `build-vscode` khi cache khớp hệ điều hành, compiler và đường dẫn dự án. Không chạy riêng `main.cpp` bằng nút Run C++.
 
 **Chưa có mô hình đã kiểm chứng trên xe.** Có đầy đủ pipeline thu dữ liệu → gán nhãn → huấn luyện cây quyết định → đánh giá theo lượt → lưu JSON → suy luận C++. Dữ liệu mô phỏng chỉ kiểm tra phần mềm. Phần đề xuất PWM là chính sách giảm giới hạn, không phải PWM tối ưu được học.
 
@@ -8,7 +8,8 @@ Bản mở rộng từ main.cpp và CMakeLists.txt người dùng cung cấp. Gi
 
 | File/thư mục | Thay đổi / mục đích |
 |---|---|
-| main.cpp | Giữ các ô kết nối/cảm biến/PID và widget QPainter; thêm AI, nút thao tác, chế độ, cấu hình, bảng lượt. Chỉ vẽ đầu ra PID cùng hàng cảm biến. |
+| main.cpp | Khởi tạo QApplication và mở giao diện. |
+| app/simulator.* | Ba tab Vận hành / Chỉnh PID / Lịch sử, QPainter vẽ u(t), kết nối chung và nút dừng luôn hiển thị; kiểm thử GUI offscreen. |
 | CMakeLists.txt | Giữ target cũ; thêm Qt SerialPort, core và test. |
 | core/engine.* | CRC/parser, timestamp rollover, cửa sổ, 9 đặc trưng, baseline rules, cây quyết định, policy PWM. Không phụ thuộc Qt. |
 | app/source.* | Nguồn mô phỏng hoặc QSerialPort bất đồng bộ, cùng bộ giải mã. |
@@ -20,7 +21,31 @@ Bản mở rộng từ main.cpp và CMakeLists.txt người dùng cung cấp. Gi
 | tests/ | Test lõi, adapter, parity Python–C++ và pipeline mô phỏng. |
 | docs/ | Giao thức, ghép Arduino, thu dữ liệu và kiểm chứng. |
 
-## Build Windows / VS Code / MSYS2
+## Ubuntu / VS Code
+
+Cần CMake, compiler C++17, Qt6 Widgets và Qt6 SerialPort (gói Ubuntu: `build-essential cmake qt6-base-dev libqt6serialport6-dev`). Cache hiện tại đã dùng `/usr/bin/c++`, Qt6 trong `/usr/lib/x86_64-linux-gnu/cmake/Qt6`, generator `Unix Makefiles` và đúng thư mục dự án Linux.
+
+```bash
+cmake -S . -B build-vscode
+cmake --build build-vscode --parallel 4
+ctest --test-dir build-vscode --output-on-failure
+./build-vscode/LineFollowerSim
+```
+
+`gui_smoke` chạy Qt offscreen, kiểm tra chuyển tab, kết nối giả lập, bắt đầu/dừng, PWM, PID, AI, mất dữ liệu, lịch sử và resize; ảnh nằm trong `build-vscode/ui-smoke/`. Có thể chạy riêng:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build-vscode/LineFollowerSim --smoke-test /tmp/linefollower-ui
+```
+
+- **Kết nối HC-05** mở hộp chọn nguồn: chọn **Dữ liệu mô phỏng** hoặc cổng serial đã ghép đôi. Có thể nhập trực tiếp `/dev/rfcomm0`; ứng dụng không tự ghép đôi Bluetooth. Baud phải khớp UART của firmware.
+- Giả lập kết nối ở trạng thái **dừng**. **Bắt đầu chạy** chạy mô phỏng và ghi lượt; nút **Dừng chạy** hoặc **DỪNG XE** dừng mô phỏng và kết thúc lượt. Thanh PWM đặt điều chỉnh giả lập; không đại diện cho tốc độ đo được.
+- **Xe thật:** giao thức hiện có chỉ hỗ trợ PING/PWM, chưa hỗ trợ START/STOP/PID. Các nút chạy/dừng và chỉnh PID thật bị vô hiệu hóa và giao diện báo rõ. **Bắt đầu ghi lượt / Kết thúc ghi lượt** chỉ ghi telemetry, không điều khiển động cơ. Đề xuất AI vẫn đi qua kiểm tra giới hạn, ACK và telemetry hiện có; thanh PWM thủ công chỉ dành cho giả lập.
+- **Xem chi tiết** trong AI giữ các thao tác áp dụng/giữ nguyên/gán nhãn, nạp mô hình và cấu hình. **Dữ liệu cảm biến → Thiết lập mô phỏng và lượt chạy** chứa kịch bản, cảm biến thủ công, ngắt dữ liệu và mã điều kiện.
+- **Chỉnh PID** chứa Kp/Ki/Kd và đồ thị u(t) có thể mở rộng. Chưa có encoder; không suy RPM từ PWM. AI chờ đủ dữ liệu trước khi hiện kết luận.
+- **Lịch sử** tự nạp các lượt đã lưu trong thư mục dữ liệu mặc định; mở **Dữ liệu đã lưu / xuất CSV** để đổi thư mục hoặc xuất bảng. Ở cửa sổ hẹp, hai thẻ vận hành xếp dọc; nội dung cuộn trong tab, kết nối và nút dừng vẫn luôn nhìn thấy.
+
+## Build Windows / VS Code / G++
 
 1. Đóng chương trình đang chạy. Sao lưu mã cũ. Chép **nội dung** thư mục này vào thư mục dự án hiện có; giữ nguyên `.vscode/` và `build-vscode/` của bạn.
 2. Dùng đúng môi trường compiler đã cấu hình: UCRT64 hoặc MINGW64, không trộn hai loại. Thư viện mới cần thêm là SerialPort. Trong terminal MSYS2 tương ứng:
@@ -49,9 +74,9 @@ Gói đính kèm ban đầu không có `build-vscode`, `.vscode/tasks.json`, `.v
 
 File: main.cpp, core/, app/, CMakeLists.txt.
 
-- Chọn **Dữ liệu mô phỏng → Connect**. Chọn **Dao động giả lập**.
-- Điền mã điều kiện rồi **Bắt đầu ghi lượt**; chờ cửa sổ 3 s và 3 dự đoán liên tiếp (mỗi 0,5 s).
-- GUI hiển thị dữ liệu mô phỏng, bộ quy tắc, PWM 100 và đề xuất giảm. PWM chưa thay khi chỉ có đề xuất.
+- Mở **Kết nối HC-05**, chọn **Dữ liệu mô phỏng → Kết nối**. Mở thiết lập mô phỏng và chọn **Dao động giả lập**.
+- Điền mã điều kiện rồi **Bắt đầu chạy**; chờ cửa sổ 3 s và 3 dự đoán liên tiếp (mỗi 0,5 s).
+- GUI hiển thị dữ liệu mô phỏng, bộ quy tắc, PWM đặt (mặc định 80) và đề xuất giảm. PWM chưa thay khi chỉ có đề xuất.
 - Nhấn **Áp dụng đề xuất**: chờ ACK rồi telemetry xác nhận. Với dao động, giảm 5; nguy cơ giảm tối đa 10. Sau thay PWM phải thu lại cửa sổ.
 - **Giữ nguyên** hoãn áp dụng 5 s. **Đánh dấu dự đoán sai** mở chọn nhãn, lưu nguyên cửa sổ chụp tại thời điểm bấm; **Xác nhận đúng** giúp lấy mẫu cả dự đoán đúng, tránh chỉ học từ lỗi.
 - Bật **Ngắt dữ liệu mô phỏng**: sau >1 s, mất trạng thái hợp lệ và khóa Áp dụng. Bỏ chọn để thu lại cửa sổ.
@@ -81,7 +106,7 @@ py ml/pipeline.py train "C:/Users/USER/Documents/LineFollowerRuns" trained-model
 .\build-vscode\model_check.exe trained-model/model.json trained-model/parity.csv
 ```
 
-Nhấn **Nạp mô hình JSON** chọn trained-model/model.json. Phải kết thúc lượt trước khi đổi mô hình. Mô hình nạp cấu hình cửa sổ/dải nhiễu đi kèm. Không có xác suất tự chế. `evaluation.json` chứa confusion matrix, precision/recall/F1 và danh sách lượt train/test. Mô hình chỉ đánh giá trạng thái hiện tại; không tự nhận là cảnh báo sớm hay đã học PWM tối ưu.
+Mở **Xem chi tiết** trong AI, nhấn **Nạp mô hình JSON** chọn trained-model/model.json. Phải kết thúc lượt trước khi đổi mô hình. Mô hình nạp cấu hình cửa sổ/dải nhiễu đi kèm. Không có xác suất tự chế. `evaluation.json` chứa confusion matrix, precision/recall/F1 và danh sách lượt train/test. Mô hình chỉ đánh giá trạng thái hiện tại; không tự nhận là cảnh báo sớm hay đã học PWM tối ưu.
 
 ## File dữ liệu xuất tự động
 

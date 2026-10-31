@@ -12,7 +12,7 @@ Source::Source(QObject *parent):QObject(parent) {
 }
 bool Source::open(const QString &port,int baud,QString &error) {
     close();simulation=port=="DEMO";
-    if(simulation){s={};s.boot=QRandomGenerator::global()->generate()|1U;s.base=100;s.kp=30;s.kd=2;s.mode=1;count=phase=0;integral=prevError=0;lastCommand=-100000;opened=true;timer.start(100);return true;}
+    if(simulation){s={};s.boot=QRandomGenerator::global()->generate()|1U;s.base=80;s.kp=30;s.kd=2;s.mode=0;count=phase=0;integral=prevError=0;lastCommand=-100000;opened=true;timer.start(100);return true;}
     serial.setPortName(port);serial.setBaudRate(baud);serial.setDataBits(QSerialPort::Data8);
     serial.setParity(QSerialPort::NoParity);serial.setStopBits(QSerialPort::OneStop);serial.setFlowControl(QSerialPort::NoFlowControl);
     if(!serial.open(QIODevice::ReadWrite)){error=serial.errorString();return false;}
