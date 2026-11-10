@@ -60,7 +60,7 @@ void Stop(){
 int basePWM = 70;
 float Kp = 25.0f;
 float Ki = 0.0f;
-float Kp = 0.0f;
+float Kd = 0.0f;
 
 float integral = 0.0f;
 float previousError = 0.0f;
@@ -71,8 +71,8 @@ unsigned long lastControlMs = 0;
 
 void ResetPID() {
     integral = 0.0f;
-    float previousError = 0.0f;
-    bool hasPreviousError = false;
+    previousError = 0.0f;
+    hasPreviousError = false;
 }
 
 void setForwardPWM(int leftPWM, int rightPWM){
@@ -86,7 +86,7 @@ void setForwardPWM(int leftPWM, int rightPWM){
     digitalWrite(In4, HIGH);
 
     analogWrite(ENA, leftPWM);
-    analogWriet(ENB, rightPWM);
+    analogWrite(ENB, rightPWM);
 
 
 }
@@ -100,7 +100,7 @@ float CaculatePID(float error, float dt){
 
     // Chua tich luy khi Ki = 0
     if(Ki != 0.0f){
-        intergtal += error * dt;
+        integral += error * dt;
         integral = constrain(intergtal, -5.0f, 5.0f);
     }
     else {
