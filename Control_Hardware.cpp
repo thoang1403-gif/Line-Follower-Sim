@@ -101,7 +101,7 @@ float CaculatePID(float error, float dt){
     // Chua tich luy khi Ki = 0
     if(Ki != 0.0f){
         integral += error * dt;
-        integral = constrain(intergtal, -5.0f, 5.0f);
+        integral = constrain(integral, -5.0f, 5.0f);
     }
     else {
         integral = 0.0f;
