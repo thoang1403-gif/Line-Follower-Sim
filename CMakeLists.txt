@@ -25,4 +25,12 @@ if(BUILD_TESTING)
     add_executable(arduino_adapter_tests tests/arduino_adapter_tests.cpp)
     target_include_directories(arduino_adapter_tests PRIVATE tests/arduino_stub arduino/TelemetryDemo)
     add_test(NAME arduino_adapter_tests COMMAND arduino_adapter_tests)
+    # Host-only firmware regression test; never link Arduino code into the GUI.
+    add_executable(arduino_control_tests tests/arduino_control_tests.cpp)
+    target_include_directories(arduino_control_tests PRIVATE tests/arduino_stub)
+    target_link_libraries(arduino_control_tests PRIVATE line_core)
+    add_test(NAME arduino_control_tests COMMAND arduino_control_tests)
+    add_test(NAME arduino_adapter_copies_match COMMAND ${CMAKE_COMMAND} -E compare_files
+        ${CMAKE_CURRENT_SOURCE_DIR}/arduino/TelemetryDemo/TelemetryLink.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/arduino/Control_Hardware/TelemetryLink.h)
 endif()

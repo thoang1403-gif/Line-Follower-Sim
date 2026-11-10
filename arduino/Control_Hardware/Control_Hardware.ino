@@ -1,5 +1,7 @@
-#include<stdio.h>
 #include<Arduino.h>
+#include<EEPROM.h>
+#include<math.h>
+#include "TelemetryLink.h"
 
 #define LeftSensor 13
 #define RightSensor 12
@@ -14,6 +16,10 @@
 
 int LeftVal;
 int RightVal;
+
+Telemetry telemetry;
+TelemetryLink telemetryLink(Serial, 200); // HC-05: 9600 baud, telemetry 5 Hz.
+const int bootIdAddress = 0; // EEPROM bytes 0..3, written only in setup().
 
 /* Function cotrols motors to go straight ahead
  void Go_Straight(){
@@ -54,6 +60,10 @@ void Stop(){
     digitalWrite(In2, 0);
     digitalWrite(In3, 0);
     digitalWrite(In4, 0);
+    telemetry.pwmL = 0;
+    telemetry.pwmR = 0;
+    telemetry.pidMilli = 0;
+    telemetry.mode = 0;
 }
 // Set PID Gain
 
@@ -87,8 +97,9 @@ void setForwardPWM(int leftPWM, int rightPWM){
 
     analogWrite(ENA, leftPWM);
     analogWrite(ENB, rightPWM);
-
-
+    telemetry.pwmL = leftPWM;
+    telemetry.pwmR = rightPWM;
+    telemetry.mode = 1;
 }
 
 float CaculatePID(float error, float dt){
@@ -137,24 +148,37 @@ void setup(){
 
     Serial.begin(9600);
 
+    uint32_t boot;
+    EEPROM.get(bootIdAddress, boot);
+    boot = (boot == 0xffffffffUL) ? 1 : boot + 1;
+    EEPROM.put(bootIdAddress, boot);
+    telemetry.boot = boot;
+    telemetry.synthetic = false;
+    telemetry.base = basePWM;
+    telemetry.kpMilli = lroundf(Kp * 1000.0f);
+    telemetry.kiMilli = lroundf(Ki * 1000.0f);
+    telemetry.kdMilli = lroundf(Kd * 1000.0f);
+    // No confirmed line-loss/search events exist in this controller.
+    telemetry.losses = 0;
+    telemetry.lastLoss = 0;
+
 }
 
-void loop(){
-    unsigned long now = millis();
-    unsigned long elapsed = now - lastControlMs;
-
-    if(elapsed < controlPeriodMs){
-        return;
-    }
-
-    lastControlMs = now;
+void controlStep(unsigned long elapsed){
+    // poll() owns the validated target; consume it at the next PID step only.
+    basePWM = telemetry.base;
     float dt = elapsed/1000.0f;
 
     // Write the value of two sensors
     LeftVal = digitalRead(LeftSensor);
     RightVal = digitalRead(RightSensor);
+    telemetry.left = LeftVal;
+    telemetry.right = RightVal;
+    float error = RightVal - LeftVal;
+    telemetry.errorMilli = lroundf(error * 1000.0f);
 
-    if( LeftVal == HIGH && RightVal == HIGH){
+    // The adapter latches this flag. Only an Arduino reset permits motion again.
+    if(telemetryLink.stopRequested || (LeftVal == HIGH && RightVal == HIGH)){
         Stop();
         ResetPID();
         return;
@@ -165,16 +189,31 @@ void loop(){
     // 1-0 -> -1: Turn Left
     // 0-1 -> +1: Turn Right
 
-    float error = RightVal - LeftVal;
-
     float u = CaculatePID(error, dt);
 
     float maxCorrection = (basePWM < 255 - basePWM) ? basePWM : 255 - basePWM;
 
     u = constrain(u, -maxCorrection, maxCorrection);
+    telemetry.pidMilli = lroundf(u * 1000.0f);
 
     int leftPWM = (int)(basePWM + u);
     int rightPWM = (int)(basePWM - u);
 
     setForwardPWM(leftPWM, rightPWM);
+}
+
+void loop(){
+    unsigned long now = millis();
+    unsigned long elapsed = now - lastControlMs;
+    if(elapsed >= controlPeriodMs){
+        lastControlMs = now;
+        controlStep(elapsed);
+    }
+
+    // Service UART even between PID steps and while stopped. No blocking waits.
+    telemetryLink.poll(telemetry, millis());
+    if(telemetryLink.stopRequested){
+        Stop();
+        ResetPID();
+    }
 }

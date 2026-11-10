@@ -16,7 +16,8 @@
 | app/controller.* | Điều phối, dữ liệu cũ, ACK + telemetry, phiên chạy, dự đoán, nhãn phản hồi. |
 | app/journal.* | Ghi file trên luồng riêng, hàng đợi giới hạn và báo lỗi ghi. |
 | app/model_io.* | Kiểm tra JSON/schema/feature order/cây trước khi nạp. |
-| arduino/TelemetryDemo/ | Sketch thử không điều khiển motor + adapter ghép vào firmware thật. |
+| arduino/Control_Hardware/ | Sketch Uno điều khiển L298N + HC-05, PID 10 ms, Serial 9600 / telemetry 5 Hz. |
+| arduino/TelemetryDemo/ | Sketch thử riêng không điều khiển motor, dữ liệu mô phỏng 38400 / 10 Hz. |
 | ml/ | Huấn luyện ngoại tuyến, gán nhãn khoảng thời gian, đánh giá sự kiện. |
 | tests/ | Test lõi, adapter, parity Python–C++ và pipeline mô phỏng. |
 | docs/ | Giao thức, ghép Arduino, thu dữ liệu và kiểm chứng. |
@@ -68,7 +69,7 @@ ctest --test-dir build-vscode --output-on-failure
 
 Giữ generator/compiler trong cache cũ; không thêm `-G` hoặc đổi toolchain khi đã có cache. Nếu dùng generator nhiều cấu hình, chạy binary trong `build-vscode/Debug/`. Nếu thiếu DLL Qt, chạy trong môi trường MSYS2 đúng compiler hoặc dùng công cụ deploy Qt của cùng bộ cài. Không chạy riêng main.cpp bằng nút Run C++.
 
-Gói đính kèm ban đầu không có `build-vscode`, `.vscode/tasks.json`, `.vscode/launch.json` hay firmware xe. Vì vậy bản này không sửa/đoán nội dung các file đó. Nếu lệnh build lỗi, gửi log và các file JSON đang dùng để ghép chính xác.
+Firmware xe nằm trong `arduino/Control_Hardware/`, được nạp riêng bằng Arduino IDE/CLI; không đưa vào target GUI Qt. Các thay đổi firmware không yêu cầu thay cấu hình `.vscode`.
 
 ## Giai đoạn 1 — GUI + mô phỏng + chỉ tư vấn
 
@@ -88,7 +89,9 @@ Mặc định: min PWM 20, max 180, mỗi lần ≤10, cách ≥3 s, 3 kết lu�
 
 File: app/source.*, core/engine.*, arduino/. Đọc docs/PROTOCOL.md và docs/ARDUINO.md.
 
-QSerialPort đã được triển khai thật; chưa kiểm tra với HC-05 của bạn. Sketch TelemetryDemo chạy để thử bản tin, **vẫn đánh dấu mô phỏng**, không điều khiển L298N. Phải ghép adapter vào `.ino` hiện có để lấy PID, PWM, trạng thái và sự kiện thật; Arduino giữ vòng PID và tìm line tại chỗ.
+Sketch xe chính là [`arduino/Control_Hardware/Control_Hardware.ino`](arduino/Control_Hardware/Control_Hardware.ino), đã tích hợp adapter vào PID hiện có: PWM nền 70, gain 25/0/0, Serial **9600**, telemetry thật **5 Hz**. Chọn 9600 trong GUI và cấu hình UART HC-05 ở 9600 riêng; chọn baud GUI không cấu hình module. Hai cảm biến HIGH/HIGH dừng theo code cũ; chưa có thuật toán tìm line hoặc đếm mất line.
+
+**Xe có thể chạy trước khi GUI kết nối.** Sau khi adapter thiết lập phiên bằng PING/PWM hợp lệ, hết heartbeat >1500 ms sẽ khóa dừng; kết nối lại không chạy lại, **chỉ reset Uno xóa khóa**. Tháo RX/TX HC-05 khỏi D0/D1 khi upload USB và thử khi kê bánh theo [hướng dẫn Arduino](docs/ARDUINO.md). Chưa kiểm tra với HC-05/L298N thật. TelemetryDemo vẫn là sketch thử riêng, đánh dấu mô phỏng và không điều khiển motor.
 
 ## Giai đoạn 3 — mô hình học máy thật
 
